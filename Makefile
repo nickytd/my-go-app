@@ -1,24 +1,28 @@
-# Project root directory
+# project root directory
 ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
-# The compiled binary is located under ./bin folder
-BINARY					?= my-go-app
-REGISTRY				?= docker.io
+# build targets
+BINARY				?= my-go-app
 VERSION 				?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "latest")
 
-PKG_DIR					:= $(ROOT_DIR)/pkg
-BIN_DIR					:= $(ROOT_DIR)/bin
+# project folder structure
+PKG_DIR				:= $(ROOT_DIR)/pkg
+BIN_DIR				:= $(ROOT_DIR)/bin
 TOOLS_DIR	 			:= $(ROOT_DIR)/hack
-TOOLS_BIN_DIR				:= $(TOOLS_DIR)/bin
+TOOLS_BIN_DIR			:= $(TOOLS_DIR)/bin
 
-GO_LINT					:= $(TOOLS_BIN_DIR)/golangci-lint
-GO_LINT_VERSION				?= v1.51.2
+# linter dependencies
+GO_LINT				:= $(TOOLS_BIN_DIR)/golangci-lint
+GO_LINT_VERSION			?= v1.51.2
 
-GINKGO 					:= $(TOOLS_BIN_DIR)/ginkgo
-GINKGO_VERSION				:= v2.9.2
+# test dependencies
+GINKGO 				:= $(TOOLS_BIN_DIR)/ginkgo
+GINKGO_VERSION			?= v2.9.2
 
-DOCKER_BUILD_PLATFORM			?= linux/amd64 linux/arm64
-DOCKER_RUNTIME_IMAGE 			?= debian:stable-slim
+# docker configuration
+DOCKER_BUILD_PLATFORM		?= linux/amd64 linux/arm64
+DOCKER_RUNTIME_IMAGE 		?= debian:stable-slim
+REGISTRY				?= docker.io
 DOCKER_CMD				:= $(BINARY)
 
 # Default target
