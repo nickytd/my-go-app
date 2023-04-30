@@ -25,69 +25,68 @@ DOCKER_RUNTIME_IMAGE 		?= debian:stable-slim
 REGISTRY				?= docker.io
 DOCKER_CMD				:= $(BINARY)
 
-# Default target
+# default target
 all: build
 
-# Cleans the binary
+# cleans the binary
 .PHONY: clean
 clean:
 	rm -f $(BIN_DIR)/$(BINARY)
 
-# Also removes the downloaded binaries
+# cleans project dependencies
 .PHONY: clean_all
 clean_all: clean
 	rm -rf $(BIN_DIR)
 	rm -rf $(TOOLS_DIR)
 
-# The build, formats, generates sources, executes the linter followed by the tests
+# The build formats, generates sources, executes the linter followed by the tests
 .PHONY: build
 build: fmt generate verify test test-integration $(BIN_DIR)/$(BINARY)
 
-# Executes code generators
+# code generators
 .PHONY: generate
 generate:
 	go mod tidy
 	go generate $(ROOT_DIR)/pkg/...
 
-# Executes project tests
+# project tests
 .PHONY: test
 test:
 	go test $(ROOT_DIR)/...
 
-# Execute ginkgo tests
+# ginkgo tests
 .PHONY: test-integration
 test-integration: $(GINKGO)
 	$(GINKGO) $(ROOT_DIR)/test/...
 
-# Build project binary target
+# project binary target
 $(BIN_DIR)/$(BINARY):
 	CGO_ENABLED=0 go build -a -installsuffix cgo -ldflags="-X main.VERSION=${VERSION}" -o $(abspath $(BIN_DIR))/$(BINARY) cmd/main.go
 
-# Formats project gode
+# formats project code
 .PHONY: fmt
 fmt:
 	go fmt $(ROOT_DIR)/...
 
-# Executes the linter
+# verify project code
 .PHONY: verify
 verify: $(GO_LINT)
+	go vet $(ROOT_DIR)/...
 	$(GO_LINT) run $(ROOT_DIR)/...
 
-# Downloads the linter binary
+# fetch linter dependency
 $(GO_LINT):
 	GOBIN=$(abspath $(TOOLS_BIN_DIR)) go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GO_LINT_VERSION)
 
-# Downloads ginkgo binary
+# fetch ginkgo dependency
 $(GINKGO):
 	GOBIN=$(abspath $(TOOLS_BIN_DIR)) go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo@$(GINKGO_VERSION)
 
-# Executes the builded binary
+# run ptoject
 run: build
 	$(BIN_DIR)/$(BINARY)
 
-# Initializes the docker buildx
-
-# Builds the container image
+# container image multi-platform build
 .PHONY: docker
 docker:
 	$(foreach arch, $(DOCKER_BUILD_PLATFORM), docker build --platform $(arch) \
@@ -98,7 +97,7 @@ docker:
 	--build-arg TARGETARCH=$(subst linux/,,$(arch)) \
 	--tag $(REGISTRY)/$(BINARY):$(VERSION)-$(subst linux/,,$(arch)) -f $(ROOT_DIR)/Dockerfile .; )
 
-# Pushes the container image to the target container registry
+# push container images
 .PHONY: docker-push
 docker-push: 
 	$(foreach arch, $(DOCKER_BUILD_PLATFORM), docker push \
