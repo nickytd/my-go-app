@@ -37,11 +37,12 @@ clean_all: clean
 
 # The build, formats, generates sources, executes the linter followed by the tests
 .PHONY: build
-build: fmt generate verify test $(BIN_DIR)/$(BINARY)
+build: fmt generate verify test test-integration $(BIN_DIR)/$(BINARY)
 
 # Executes code generators
 .PHONY: generate
 generate:
+	go mod tidy
 	go generate $(ROOT_DIR)/pkg/...
 
 # Executes project tests
