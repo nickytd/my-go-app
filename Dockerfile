@@ -1,28 +1,29 @@
-ARG RUNTIME_IMAGE=alpine:3.16
-FROM --platform=${BUILDPLATFORM} golang:1.19 AS builder
+FROM --platform=${TARGETPLATFORM} golang:1.20 AS builder
 ARG BINARY
-
+ARG VERSION
+ARG TARGETPLATFORM
+ARG TARGETARCH
 WORKDIR $GOPATH/src/${BINARY}
 
 # Copy project sources
 COPY . .
-RUN go mod download
-
-ARG VERSION
-ARG TARGETPLATFORM
-ARG BUILDPLATFORM
+RUN go mod tidy
 
 # Compiles the binary
-RUN GOARCH=${GOARCH} VERSION=${VERSION} CGO_ENABLED=0 \
+RUN GOOS=linux GOARCH=${TARGETARCH} VERSION=${VERSION} CGOENABLED=0 \
     go build -a -installsuffix cgo -ldflags="-X main.VERSION=${VERSION}" \
-    -o ${BINARY} cmd/main.go
+    -o /${BINARY} cmd/main.go
+
 
 # Builds target image
-FROM ${RUNTIME_IMAGE}
+FROM --platform="${TARGETPLATFORM}" debian:stable-slim
+ARG CONTAINERCMD
+ARG VERSION
 ARG BINARY
-COPY --from=builder /go/src/${BINARY}/${BINARY} /bin/${BINARY}
+LABEL version=${VERSION}
+ENV cmd="${CONTAINERCMD}"
+COPY --from=builder /${BINARY} /bin
 
 # UID/GID 65532 is also known as nonroot user in distroless image
 USER 65532:65532
-
-ENTRYPOINT ["/bin/${BINARY}"]
+CMD /bin/$cmd
