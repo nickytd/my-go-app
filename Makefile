@@ -3,8 +3,7 @@ ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
 # The compiled binary is located under ./bin folder
 BINARY					?= my-go-app
-GO_MODULE					:= my-go-app
-REGISTRY					?= docker.io
+BASE						:= $(shell basename $(ROOT_DIR))
 VERSION 					?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "latest")
 
 PKG_DIR					:= $(ROOT_DIR)/pkg
@@ -20,7 +19,8 @@ GINKGO_VERSION				:= v2.9.2
 
 DOCKER_BUILD_PLATFORM			?= linux/amd64,linux/arm64
 DOCKER_RUNTIME_IMAGE 			?= debian:stable-slim
-DOCKER_CONTAINER_IMAGE			:=$(REGISTRY)/$(BINARY):$(VERSION)
+DOCKER_CONTAINER_REGISTRY		?= docker.io
+DOCKER_CONTAINER_IMAGE			:= $(DOCKER_CONTAINER_REGISTRY)/$(BINARY):$(VERSION)
 
 # The build, formats, generates sources, executes the linter followed by the tests
 all: generate verify test build
@@ -59,11 +59,13 @@ verify: $(GO_LINT)
 
 # Downloads the linter binary
 $(GO_LINT):
-	@GOBIN=$(abspath $(TOOLS_BIN_DIR)) go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GO_LINT_VERSION)
+	@GOBIN=$(abspath $(TOOLS_BIN_DIR)) go install \
+	  github.com/golangci/golangci-lint/cmd/golangci-lint@$(GO_LINT_VERSION)
 
 # Downloads ginkgo binary
 $(GINKGO):
-	@GOBIN=$(abspath $(TOOLS_BIN_DIR)) go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo@$(GINKGO_VERSION)
+	@GOBIN=$(abspath $(TOOLS_BIN_DIR)) go install -mod=mod \
+	  github.com/onsi/ginkgo/v2/ginkgo@$(GINKGO_VERSION)
 
 # Executes the build binary
 run: build
@@ -73,22 +75,16 @@ run: build
 .PHONY: docker
 docker:
 	@docker build --tag $(DOCKER_CONTAINER_IMAGE) \
-	  --build-arg GO_MODULE="$(GO_MODULE)" \
-	  --build-arg BINARY="$(GO_MODULE)/bin/$(BINARY)" \
-	  --build-arg CONTAINER_CMD="$(BINARY)" \
+	  --build-arg BASE="$(BASE)" \
+	  --build-arg BINARY="$(BINARY)" \
 	  --build-arg VERSION="$(VERSION)" \
 	  -f Dockerfile .
 
 .PHONY: docker-push
 docker-push:
-	@docker buildx create --name=$(BINARY) --use || true 
-	@docker buildx build --platform="$(DOCKER_BUILD_PLATFORM)" \
-	  --build-arg GO_MODULE="$(GO_MODULE)" \
-	  --build-arg BINARY="$(GO_MODULE)/bin/$(BINARY)" \
-	  --build-arg CONTAINER_CMD="$(BINARY)" \
-	  --build-arg VERSION="$(VERSION)" \
-	  --tag $(DOCKER_CONTAINER_IMAGE) \
-	  --push -f Dockerfile .
+	@$(ROOT_DIR)/hack/multi-platform-build.sh	\
+	  "$(DOCKER_BUILD_PLATFORM)" "$(DOCKER_CONTAINER_IMAGE)" \
+	  "$(BASE)" "$(BINARY)" "$(VERSION)"
 
 # Cleans the binary
 .PHONY: clean

@@ -1,6 +1,6 @@
 FROM --platform=${TARGETPLATFORM} golang:1.20 AS builder
-ARG GO_MODULE
-WORKDIR $GOPATH/src/${GO_MODULE}
+ARG BASE=
+WORKDIR $GOPATH/src/$BASE
 
 # Copy project sources
 COPY . .
@@ -10,13 +10,15 @@ RUN make build
 
 # Builds target image
 FROM --platform="${TARGETPLATFORM}" debian:stable-slim
-ARG CONTAINER_CMD
-ARG VERSION
-ARG BINARY
+
+ARG VERSION=latest
 LABEL version=${VERSION}
-ENV cmd=${CONTAINER_CMD}
-COPY --from=builder /go/src/${BINARY} /${CONTAINER_CMD}
+
+ARG BASE=
+COPY --from=builder /go/src/$BASE /
 
 # UID/GID 65532 is also known as nonroot user in distroless image
 USER 65532:65532
-CMD /$cmd
+ARG BINARY=
+ENV BINARY=${BINARY}
+CMD ${BINARY}
