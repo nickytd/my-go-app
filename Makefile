@@ -1,110 +1,104 @@
-# project root directory
+# Project root directory
 ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
-# build targets
-BINARY				?= my-go-app
-VERSION 				?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "latest")
+# The compiled binary is located under ./bin folder
+BINARY					?= my-go-app
+GO_MODULE					:= my-go-app
+REGISTRY					?= docker.io
+VERSION 					?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "latest")
 
-# project folder structure
-PKG_DIR				:= $(ROOT_DIR)/pkg
-BIN_DIR				:= $(ROOT_DIR)/bin
-TOOLS_DIR	 			:= $(ROOT_DIR)/hack
-TOOLS_BIN_DIR			:= $(TOOLS_DIR)/bin
+PKG_DIR					:= $(ROOT_DIR)/pkg
+BIN_DIR					:= $(ROOT_DIR)/bin
+TOOLS_DIR	 				:= $(ROOT_DIR)/hack
+TOOLS_BIN_DIR				:= $(TOOLS_DIR)/bin
 
-# linter dependencies
-GO_LINT				:= $(TOOLS_BIN_DIR)/golangci-lint
-GO_LINT_VERSION			?= v1.51.2
+GO_LINT					:= $(TOOLS_BIN_DIR)/golangci-lint
+GO_LINT_VERSION				?= v1.51.2
 
-# test dependencies
-GINKGO 				:= $(TOOLS_BIN_DIR)/ginkgo
-GINKGO_VERSION			?= v2.9.2
+GINKGO 					:= $(TOOLS_BIN_DIR)/ginkgo
+GINKGO_VERSION				:= v2.9.2
 
-# docker configuration
-DOCKER_BUILD_PLATFORM		?= linux/amd64 linux/arm64
-DOCKER_RUNTIME_IMAGE 		?= debian:stable-slim
-REGISTRY				?= docker.io
-DOCKER_CMD				:= $(BINARY)
+DOCKER_BUILD_PLATFORM			?= linux/amd64,linux/arm64
+DOCKER_RUNTIME_IMAGE 			?= debian:stable-slim
+DOCKER_CONTAINER_IMAGE			:=$(REGISTRY)/$(BINARY):$(VERSION)
 
-# default target
-all: build
+# The build, formats, generates sources, executes the linter followed by the tests
+all: generate verify test build
 
-# cleans the binary
-.PHONY: clean
-clean:
-	rm -f $(BIN_DIR)/$(BINARY)
-
-# cleans project dependencies
-.PHONY: clean_all
-clean_all: clean
-	rm -rf $(BIN_DIR)
-	rm -rf $(TOOLS_DIR)
-
-# The build formats, generates sources, executes the linter followed by the tests
-.PHONY: build
-build: fmt generate verify test test-integration $(BIN_DIR)/$(BINARY)
-
-# code generators
+# Executes code generators
 .PHONY: generate
 generate:
-	go mod tidy
-	go generate $(ROOT_DIR)/pkg/...
+	@go fmt $(ROOT_DIR)/...
+	@go mod tidy
+	@go generate $(ROOT_DIR)/pkg/...
 
-# project tests
+# Executes project tests
 .PHONY: test
-test:
-	go test $(ROOT_DIR)/...
+test: verify
+	@go test $(ROOT_DIR)/...
 
-# ginkgo tests
+# Execute ginkgo tests
 .PHONY: test-integration
-test-integration: $(GINKGO)
-	$(GINKGO) $(ROOT_DIR)/test/...
+test-integration: $(GINKGO) verify
+	@$(GINKGO) $(ROOT_DIR)/test/...
 
-# project binary target
-$(BIN_DIR)/$(BINARY):
-	CGO_ENABLED=0 go build -a -installsuffix cgo -ldflags="-X main.VERSION=${VERSION}" -o $(abspath $(BIN_DIR))/$(BINARY) cmd/main.go
+# Build project binary target
+build:
+	@CGO_ENABLED=0 go build -ldflags="-X main.VERSION=${VERSION}" \
+	  -o $(ROOT_DIR)/bin/$(BINARY) $(ROOT_DIR)/cmd/main.go
 
-# formats project code
+# Formats project gode
 .PHONY: fmt
 fmt:
-	go fmt $(ROOT_DIR)/...
+	@go fmt $(ROOT_DIR)/...
 
-# verify project code
+# Executes the linter
 .PHONY: verify
 verify: $(GO_LINT)
-	go vet $(ROOT_DIR)/...
-	$(GO_LINT) run $(ROOT_DIR)/...
+	@$(GO_LINT) run $(ROOT_DIR)/...
 
-# fetch linter dependency
+# Downloads the linter binary
 $(GO_LINT):
-	GOBIN=$(abspath $(TOOLS_BIN_DIR)) go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GO_LINT_VERSION)
+	@GOBIN=$(abspath $(TOOLS_BIN_DIR)) go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GO_LINT_VERSION)
 
-# fetch ginkgo dependency
+# Downloads ginkgo binary
 $(GINKGO):
-	GOBIN=$(abspath $(TOOLS_BIN_DIR)) go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo@$(GINKGO_VERSION)
+	@GOBIN=$(abspath $(TOOLS_BIN_DIR)) go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo@$(GINKGO_VERSION)
 
-# run ptoject
+# Executes the build binary
 run: build
-	$(BIN_DIR)/$(BINARY)
-
-# container image multi-platform build
+	@$(BIN_DIR)/$(BINARY)
+	
+# Builds the container image
 .PHONY: docker
 docker:
-	$(foreach arch, $(DOCKER_BUILD_PLATFORM), docker build --platform $(arch) \
-	--build-arg BINARY=$(BINARY) \
-	--build-arg VERSION=$(VERSION) \
-	--build-arg RUNTIME_IMAGE=$(DOCKER_RUNTIME_IMAGE) \
-	--build-arg CONTAINERCMD=$(DOCKER_CMD) \
-	--build-arg TARGETARCH=$(subst linux/,,$(arch)) \
-	--tag $(REGISTRY)/$(BINARY):$(VERSION)-$(subst linux/,,$(arch)) -f $(ROOT_DIR)/Dockerfile .; )
+	@docker build --tag $(DOCKER_CONTAINER_IMAGE) \
+	  --build-arg GO_MODULE="$(GO_MODULE)" \
+	  --build-arg BINARY="$(GO_MODULE)/bin/$(BINARY)" \
+	  --build-arg CONTAINER_CMD="$(BINARY)" \
+	  --build-arg VERSION="$(VERSION)" \
+	  -f Dockerfile .
 
-# push container images
 .PHONY: docker-push
-docker-push: 
-	$(foreach arch, $(DOCKER_BUILD_PLATFORM), docker push \
-	$(REGISTRY)/$(BINARY):$(VERSION)-$(subst linux/,,$(arch)) ; )
-	docker manifest rm $(REGISTRY)/$(BINARY):$(VERSION) || true
-	docker manifest create $(REGISTRY)/$(BINARY):$(VERSION) $(foreach arch, $(DOCKER_BUILD_PLATFORM),--amend $(REGISTRY)/$(BINARY):$(VERSION)-$(subst linux/,,$(arch))) 
-	$(foreach arch, $(DOCKER_BUILD_PLATFORM), docker manifest annotate --os linux --arch $(subst linux/,,$(arch)) $(REGISTRY)/$(BINARY):$(VERSION) $(REGISTRY)/$(BINARY):$(VERSION)-$(subst linux/,,$(arch)) ; ) 
-	docker manifest push $(REGISTRY)/$(BINARY):$(VERSION)
+docker-push:
+	@docker buildx create --name=$(BINARY) --use || true 
+	@docker buildx build --platform="$(DOCKER_BUILD_PLATFORM)" \
+	  --build-arg GO_MODULE="$(GO_MODULE)" \
+	  --build-arg BINARY="$(GO_MODULE)/bin/$(BINARY)" \
+	  --build-arg CONTAINER_CMD="$(BINARY)" \
+	  --build-arg VERSION="$(VERSION)" \
+	  --tag $(DOCKER_CONTAINER_IMAGE) \
+	  --push -f Dockerfile .
+
+# Cleans the binary
+.PHONY: clean
+clean:
+	@go clean -testcache -modcache  || true	
+	@rm -f $(BIN_DIR)/$(BINARY)
 	
+.PHONY: clean_all
+clean_all: clean
+	@docker buildx rm $(BINARY) || true
+	@rm -rf $(BIN_DIR)
+	@rm -rf $(TOOLS_DIR)
 
