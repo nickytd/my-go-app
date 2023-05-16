@@ -1,4 +1,4 @@
-FROM --platform=${TARGETPLATFORM} golang:1.20 AS builder
+FROM golang:1.20 AS builder
 ARG BASE=
 WORKDIR $GOPATH/src/$BASE
 
@@ -9,7 +9,7 @@ RUN go mod tidy
 RUN make build
 
 # Builds target image
-FROM --platform="${TARGETPLATFORM}" debian:stable-slim
+FROM alpine:3.18.0
 
 ARG VERSION=latest
 LABEL version=${VERSION}
