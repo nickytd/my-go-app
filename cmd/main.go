@@ -2,6 +2,8 @@ package main
 
 import "log"
 
+var VERSION = ""
+
 func main() {
-	log.Println("starting ...")
+	log.Printf("starting ... %s", VERSION)
 }
