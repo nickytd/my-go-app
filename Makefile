@@ -2,10 +2,8 @@
 ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
 # The compiled binary is located under ./bin folder
-BINARY					?= my-go-app
-BASE						:= $(shell basename $(ROOT_DIR))
-COMMIT 					?= $(shell git rev-list --tags --max-count=1 HEAD --abbrev-commit)
-VERSION                             ?= $(shell git describe $(COMMIT) --tags 2>/dev/null || echo "$(COMMIT)")
+VERSION                     ?=$(shell cat VERSION)-$(shell git rev-parse --short HEAD)
+VERSION_SEMVER              ?=$(shell echo $(VERSION) | grep -o 'v[0-9]\+\.[0-9]\+\.[0-9]\+')
 
 PKG_DIR					:= $(ROOT_DIR)/pkg
 BIN_DIR					:= $(ROOT_DIR)/bin
