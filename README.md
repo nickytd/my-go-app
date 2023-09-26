@@ -11,6 +11,6 @@ In the Makefile change the following variables:
 
 In the `go.mod` adjust the module name.
 
-The [Dockerfile](Dockerfile) provides multi platform container image builds for `linux/amd64` and `linux/arm64` by default. It uses classical approach with creating a docker registry manifest and does not depend on [docker buildx](https://docs.docker.com/build/building/multi-platform/).
+The [Dockerfile](Dockerfile) provides multi platform container image builds for `linux/amd64` and `linux/arm64` by default. It uses  [docker buildx](https://docs.docker.com/build/building/multi-platform/) to provide multiplatform container image build. It uses container image build cache to optimize the building process.
 
 The intend is to provide an easy start for project development and shall be extended according the concrete needs and requirements.
