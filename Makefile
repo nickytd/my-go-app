@@ -2,24 +2,27 @@
 ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
 # The compiled binary is located under ./bin folder
+BINARY                      ?= my-go-app
+BASE                        := $(shell basename $(ROOT_DIR))
+COMMIT                      ?= $(shell git rev-list --tags --max-count=1 HEAD --abbrev-commit)
 VERSION                     ?=$(shell cat VERSION)-$(shell git rev-parse --short HEAD)
 VERSION_SEMVER              ?=$(shell echo $(VERSION) | grep -o 'v[0-9]\+\.[0-9]\+\.[0-9]\+')
 
-PKG_DIR					:= $(ROOT_DIR)/pkg
-BIN_DIR					:= $(ROOT_DIR)/bin
-TOOLS_DIR	 				:= $(ROOT_DIR)/hack
-TOOLS_BIN_DIR				:= $(TOOLS_DIR)/bin
+PKG_DIR                     := $(ROOT_DIR)/pkg
+BIN_DIR                     := $(ROOT_DIR)/bin
+TOOLS_DIR                   := $(ROOT_DIR)/hack
+TOOLS_BIN_DIR               := $(TOOLS_DIR)/bin
 
-GO_LINT					:= $(TOOLS_BIN_DIR)/golangci-lint
+GO_LINT                     := $(TOOLS_BIN_DIR)/golangci-lint
 GO_LINT_VERSION             ?= v1.54.2
 
-GINKGO 					:= $(TOOLS_BIN_DIR)/ginkgo
+GINKGO                      := $(TOOLS_BIN_DIR)/ginkgo
 GINKGO_VERSION              := v2.12.1
 
-DOCKER_BUILD_PLATFORM			?= linux/amd64,linux/arm64
-DOCKER_RUNTIME_IMAGE 			?= alpine:3.18.0
-DOCKER_CONTAINER_REGISTRY		?= docker.io
-DOCKER_CONTAINER_IMAGE			:= $(DOCKER_CONTAINER_REGISTRY)/$(BINARY):$(VERSION)
+CONTAINER_BUILD_PLATFORM    ?= linux/amd64,linux/arm64
+CONTAINER_BASE_IMAGE        ?= gcr.io/distroless/static:nonroot
+CONTAINER_REGISTRY          ?= docker.io
+CONTAINER_IMAGE             := $(CONTAINER_REGISTRY)/$(BINARY):$(VERSION)
 
 # The build, formats, generates sources, executes the linter followed by the tests
 all: generate verify test build
@@ -69,31 +72,29 @@ $(GINKGO):
 # Executes the build binary
 run: build
 	@$(BIN_DIR)/$(BINARY)
-	
+
 # Builds the container image
-.PHONY: docker
-docker:
-	@docker build --tag $(DOCKER_CONTAINER_IMAGE) \
-	  --build-arg BASE="$(BASE)" \
+.PHONY: container
+container:
+	@docker build --tag $(CONTAINER_IMAGE) \
 	  --build-arg BINARY="$(BINARY)" \
 	  --build-arg VERSION="$(VERSION)" \
 	  -f Dockerfile .
 
-.PHONY: docker-push
-docker-push:
+.PHONY: container
+container-push:
 	@$(ROOT_DIR)/hack/multi-platform-build.sh	\
-	  "$(DOCKER_BUILD_PLATFORM)" "$(DOCKER_CONTAINER_IMAGE)" \
-	  "$(BASE)" "$(BINARY)" "$(VERSION)"
+	  "$(CONTAINER_BUILD_PLATFORM)" "$(CONTAINER_IMAGE)" \
+	  "$(BINARY)" "$(VERSION)"
 
 # Cleans the binary
 .PHONY: clean
 clean:
-	@go clean -testcache -modcache  || true	
+	@go clean -testcache -modcache  || true
 	@rm -f $(BIN_DIR)/$(BINARY)
-	
+
 .PHONY: clean_all
 clean_all: clean
 	@docker buildx rm $(BINARY) || true
 	@rm -rf $(BIN_DIR)
 	@rm -rf $(TOOLS_DIR)
-
