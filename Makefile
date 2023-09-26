@@ -13,10 +13,10 @@ TOOLS_DIR	 				:= $(ROOT_DIR)/hack
 TOOLS_BIN_DIR				:= $(TOOLS_DIR)/bin
 
 GO_LINT					:= $(TOOLS_BIN_DIR)/golangci-lint
-GO_LINT_VERSION				?= v1.51.2
+GO_LINT_VERSION             ?= v1.54.2
 
 GINKGO 					:= $(TOOLS_BIN_DIR)/ginkgo
-GINKGO_VERSION				:= v2.9.2
+GINKGO_VERSION              := v2.12.1
 
 DOCKER_BUILD_PLATFORM			?= linux/amd64,linux/arm64
 DOCKER_RUNTIME_IMAGE 			?= alpine:3.18.0
