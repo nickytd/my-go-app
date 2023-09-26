@@ -1,2 +1,7 @@
+# Skip project binary downloads
 hack
 bin
+
+# Skip git folders
+.git
+.gitignore
